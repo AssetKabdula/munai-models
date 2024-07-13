@@ -1,0 +1,12 @@
+tqdm
+numpy
+pandas
+matplotlib
+watermark
+scikit-learn
+scipy
+seaborn
+tensorflow
+xgboost
+wheel
+lightgbm

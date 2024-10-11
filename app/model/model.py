@@ -8,7 +8,6 @@ from tensorflow.keras import layers
 from xgboost import XGBRegressor
 from sklearn.preprocessing import StandardScaler
 
-TYPES = ['effect_na', 'min_ves', 'ves_na_kru', 'moment']
 
 # Define feature engineering function
 def add_features(df):
@@ -29,72 +28,69 @@ def add_features(df):
 BASE_DIR = Path(__file__).resolve(strict=True).parent
 
 # Load the model and scalers using joblib
-def load_models_and_scalers(model_type):
+def load_models_and_scalers():
     """Load the Keras neural network model and XGBoost model along with their scalers."""
-    nn_model = tf.keras.models.load_model(f'{BASE_DIR}/nn_model_{model_type}.h5')
-    xgb_model = joblib.load(f'{BASE_DIR}/xgb_model_{model_type}.pkl')
-    x_scaler = joblib.load(f'{BASE_DIR}/x_scaler_{model_type}.pkl')
-    y_scaler = joblib.load(f'{BASE_DIR}/y_scaler_{model_type}.pkl')
+    nn_model = tf.keras.models.load_model(f'{BASE_DIR}/nn_model_effect_na.h5')
+    xgb_model = joblib.load(f'{BASE_DIR}/xgb_model_effect_na.pkl')
+    x_scaler = joblib.load(f'{BASE_DIR}/x_scaler_effect_na.pkl')
+    y_scaler = joblib.load(f'{BASE_DIR}/y_scaler_effect_na.pkl')
     return nn_model, xgb_model, x_scaler, y_scaler
 
 # Define output columns for each type
-def get_output_columns(model_type):
+def get_output_columns():
     """Get output columns based on the model type."""
-    if model_type == 'effect_na':
-        return ['Грузоподъёмность вышки(effect_na)', 'Бурение ротором(effect_na)', 'Спиральный изгиб(без вращения)(effect_na)',
-                'Подъём(effect_na)', 'Синусоидальный изгиб(все операции)(effect_na)', 'Спуск(effect_na)', 
-                'Бурение ГЗД(effect_na)', 'Спиральный изгиб(с вращением)(effect_na)', 'Предел натяжения(effect_na)'] 
-    elif model_type == 'ves_na_kru':
-        return ['Грузоподъёмность вышки(ves_na_kru)', 'Бурение ротором(ves_na_kru)', 'Подъём(ves_na_kru)', 
-                'Спуск(ves_na_kru)', 'Бурение ГЗД(ves_na_kru)', 'Мин. вес до спирального изгиба (спуск)(ves_na_kru)',
-                'Макс. вес до предела текучести (подъём)(ves_na_kru)']  
-    elif model_type == 'moment':
-        return ['Бурение ротором(moment)', 'Подъём(moment)', 'Make-up Torque(moment)', 'Спуск(moment)', 'Момент свинчивания(moment)']  
-    elif model_type == 'min_ves':
-        return ['Мин. вес на долоте до спирального изгиба (бурение ротором)(min_ves)', 'Мин. вес на долоте до синусоидального изгиба (бурение ГЗД)(min_ves)',
-                'Мин. вес на долоте до синусоидального изгиба (бурение ротором)(min_ves)', 'Мин. вес на долоте до спирального изгиба (бурение ГЗД)(min_ves)']  
-    
-    return ['prediction']
+    return ['Грузоподъёмность вышки', 'Бурение ротором', 'Спиральный изгиб(без вращения)',
+                'Подъём', 'Синусоидальный изгиб(все операции)', 'Спуск', 
+                'Бурение ГЗД', 'Спиральный изгиб(с вращением)', 'Предел натяжения'] 
+
 
 # Make prediction with the model
 def make_prediction(input_data):
     """Make predictions using the loaded models and scalers."""
-    prediction_dfs = []
-    
-    # Apply feature engineering
-    input_data = add_features(input_data)
-    
-    # Load models and scalers for each type
-    for model_type in TYPES:
-        nn_model, xgb_model, x_scaler, y_scaler = load_models_and_scalers(model_type)
-             
+    # Ensure input_data is a DataFrame
+    if isinstance(input_data, pd.DataFrame):
+        # Apply feature engineering to the entire DataFrame
+        input_data = add_features(input_data)
+        
+        # Load models and scalers for each type
+        nn_model, xgb_model, x_scaler, y_scaler = load_models_and_scalers()
+        
         # Scale input data
         input_scaled = x_scaler.transform(input_data)
 
-        # Make predictions using the neural network
-        nn_predictions = nn_model.predict(input_scaled)
+        # Prepare an empty list to store predictions
+        predictions = []
+        
+        # Loop through each row to make individual predictions
+        for index, row in input_data.iterrows():
+            # Reshape the row for the model
+            row_scaled = input_scaled[index].reshape(1, -1)
 
-        # Combine predictions with original input dataset for XGBoost
-        xgb_input = np.concatenate((input_scaled, nn_predictions), axis=1)
+            # Make predictions using the neural network
+            nn_prediction = nn_model.predict(row_scaled)
 
-        # Make predictions using XGBoost
-        xgb_predictions = xgb_model.predict(xgb_input)
+            # Combine predictions for XGBoost
+            xgb_input = np.concatenate((row_scaled, nn_prediction), axis=1)
 
-        # Inverse scale the predictions
-        prediction = y_scaler.inverse_transform(xgb_predictions)
+            # Make predictions using XGBoost
+            xgb_prediction = xgb_model.predict(xgb_input)
 
+            # Inverse scale the predictions
+            inverse_prediction = y_scaler.inverse_transform(xgb_prediction)
+
+            # Store the prediction
+            predictions.append(inverse_prediction[0])  # Append the prediction result
+        
         # Get unique output columns for the current type
-        output_columns = get_output_columns(model_type)
+        output_columns = get_output_columns()
 
-        # Create a DataFrame for the predictions with appropriate columns
-        predictions = pd.DataFrame(prediction, columns=output_columns)
+        # Create a DataFrame for the predictions
+        predictions_df = pd.DataFrame(predictions, columns=output_columns)
 
         # Convert to long format
-        predictions_long = predictions.melt(var_name='Variable', value_name='Predictions')
+        predictions_long = predictions_df.melt(var_name='Variable', value_name='Predictions')
+        
+        return predictions_long
+    else:
+        raise ValueError("Input data must be a pandas DataFrame.")
 
-        # Add the current type to the dataframe
-        prediction_dfs.append(predictions_long)
-    
-    # Concatenate all predictions dataframes
-    concatenated_prediction_df = pd.concat(prediction_dfs, ignore_index=True)
-    return concatenated_prediction_df

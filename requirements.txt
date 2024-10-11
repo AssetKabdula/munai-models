@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 scikit-learn==1.5.1
 pandas==2.2.2
 numpy
@@ -6,17 +5,3 @@ joblib
 keras
 tensorflow
 xgboost
-=======
-tqdm
-numpy
-pandas
-matplotlib
-watermark
-scikit-learn
-scipy
-seaborn
-tensorflow
-xgboost
-wheel
-lightgbm
->>>>>>> origin/main

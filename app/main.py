@@ -1,13 +1,24 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import pandas as pd
-import numpy as np
 from collections import defaultdict
-from app.model.model import make_prediction
+from app.effect_na.effect_na import make_prediction_effect_na
+from app.ves_na_kru.ves_na_kru import make_prediction_ves_na_kru
+from app.moment.moment import make_prediction_moment
+from app.min_ves.min_ves import make_prediction_min_ves
 
 # Initialize FastAPI app
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_methods=["*"],   # Allows all methods
+    allow_headers=["*"],   # Allows all headers
+)
 
 # Define a request model that allows multiple values (as lists) for each feature
 class CommonRequest(BaseModel):
@@ -63,10 +74,47 @@ class CommonRequest(BaseModel):
 def read_root():
     return {"message": "Welcome to the Munai-Research prediction API"}
 
-# Prediction endpoint for batch processing
-@app.post("/predict/")
-def predict(request: CommonRequest):
+# Separate prediction endpoint for each model
 
+@app.post("/predict/effect_na/")
+def predict_effect_na(request: CommonRequest):
+    # Convert the input data into a DataFrame for batch prediction
+    input_data = create_dataframe(request)
+    
+    # Use the effect_na model to make a prediction
+    prediction_df = make_prediction_effect_na(input_data)
+    return organize_predictions(prediction_df)
+
+@app.post("/predict/ves_na_kru/")
+def predict_ves_na_kru(request: CommonRequest):
+    # Convert the input data into a DataFrame for batch prediction
+    input_data = create_dataframe(request)
+
+    # Use the ves_na_kru model to make a prediction
+    prediction_df = make_prediction_ves_na_kru(input_data)
+    return organize_predictions(prediction_df)
+
+@app.post("/predict/moment/")
+def predict_moment(request: CommonRequest):
+    # Convert the input data into a DataFrame for batch prediction
+    input_data = create_dataframe(request)
+
+    # Use the moment model to make a prediction
+    prediction_df = make_prediction_moment(input_data)
+    return organize_predictions(prediction_df)
+
+@app.post("/predict/min_ves/")
+def predict_min_ves(request: CommonRequest):
+    # Convert the input data into a DataFrame for batch prediction
+    input_data = create_dataframe(request)
+
+    # Use the min_ves model to make a prediction
+    prediction_df = make_prediction_min_ves(input_data)
+    return organize_predictions(prediction_df)
+
+# Helper functions
+
+def create_dataframe(request: CommonRequest) -> pd.DataFrame:
     # Convert the input data into a DataFrame for batch prediction
     input_data = pd.DataFrame({
         'MD': request.MD,
@@ -94,9 +142,10 @@ def predict(request: CommonRequest):
     # Check if the input data is valid and consistent
     if not all(len(lst) == len(request.MD) for lst in input_data.values.T):
         raise HTTPException(status_code=400, detail="All input lists must have the same length.")
+    
+    return input_data
 
-    # Use model to make prediction
-    prediction_df = make_prediction(input_data)
+def organize_predictions(prediction_df: pd.DataFrame) -> dict:
     # Group predictions by variable
     predictions_by_variable = defaultdict(list)
 

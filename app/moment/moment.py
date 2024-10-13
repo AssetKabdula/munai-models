@@ -30,22 +30,19 @@ BASE_DIR = Path(__file__).resolve(strict=True).parent
 # Load the model and scalers using joblib
 def load_models_and_scalers():
     """Load the Keras neural network model and XGBoost model along with their scalers."""
-    nn_model = tf.keras.models.load_model(f'{BASE_DIR}/nn_model_effect_na.h5')
-    xgb_model = joblib.load(f'{BASE_DIR}/xgb_model_effect_na.pkl')
-    x_scaler = joblib.load(f'{BASE_DIR}/x_scaler_effect_na.pkl')
-    y_scaler = joblib.load(f'{BASE_DIR}/y_scaler_effect_na.pkl')
+    nn_model = tf.keras.models.load_model(f'{BASE_DIR}/nn_model_moment.h5')
+    xgb_model = joblib.load(f'{BASE_DIR}/xgb_model_moment.pkl')
+    x_scaler = joblib.load(f'{BASE_DIR}/x_scaler_moment.pkl')
+    y_scaler = joblib.load(f'{BASE_DIR}/y_scaler_moment.pkl')
     return nn_model, xgb_model, x_scaler, y_scaler
 
 # Define output columns for each type
 def get_output_columns():
     """Get output columns based on the model type."""
-    return ['Грузоподъёмность вышки', 'Бурение ротором', 'Спиральный изгиб(без вращения)',
-                'Подъём', 'Синусоидальный изгиб(все операции)', 'Спуск', 
-                'Бурение ГЗД', 'Спиральный изгиб(с вращением)', 'Предел натяжения'] 
-
+    return ['Бурение ротором', 'Подъём', 'Make-up Torque', 'Спуск', 'Момент свинчивания']  
 
 # Make prediction with the model
-def make_prediction(input_data):
+def make_prediction_moment(input_data):
     """Make predictions using the loaded models and scalers."""
     # Ensure input_data is a DataFrame
     if isinstance(input_data, pd.DataFrame):
